@@ -1,0 +1,7 @@
+*.img
+*.npz
+*.tif
+*.tif.aux.xml
+__pycache__
+src/results
+src/logs_planet
