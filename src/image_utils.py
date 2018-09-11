@@ -1,115 +1,200 @@
 import os
-import rasterio
+import gdal
+import osr
 import numpy as np
+import psutil
 
 import math
-from rasterio import windows
 from sklearn.model_selection import train_test_split
 
-def get_chips(path_image, size = 100, pad_x = 0, pad_y = 0, nodata_value = 0, remove_chips_wnodata=False):
-	indexes = None
-	dataset = rasterio.open(path_image, dtype=rasterio.float32)
-	height = dataset.height
-	width = dataset.width
-	n_grid_height = math.ceil(dataset.height/float(size)) - 1
-	n_grid_width = math.ceil(dataset.width/float(size)) - 1
+def pad_index(index, dim_size, chip_size, pad_size):
 
-	data_result = []
-	windows_result = []
+	i0 = (index - pad_size)
+	i1 = (index + chip_size + pad_size)
 
-	for i in range(n_grid_height):
-		for j in range(n_grid_width):
-			
-			row_start = i*size + pad_y
-			col_start = j*size + pad_x
-			
-			window_aux = windows.Window(col_start, row_start, size, size)
-			data_aux = dataset.read(indexes, window=window_aux, masked=False, boundless=True)
+	if i1 > (dim_size + pad_size):
+		i1 = (dim_size + pad_size)
+		i0 = i1 - chip_size - 2*pad_size
 
-			if(not remove_chips_wnodata or float(np.min(data_aux)) != float(nodata_value)):
-				data_result.append(data_aux)
-				windows_result.append(window_aux)
+	return i0, i1
 
-			if (row_start + size*2) > height or (col_start + size*2) > width:
-				break
+def split_data(data, pad_size):
+	nbands, xsize, ysize = data.shape
+
+	last_band = (nbands-1)
 	
-	dataset.close()
+	x0 = pad_size
+	x1 = xsize-pad_size
 
-	return data_result, windows_result
+	y0 = pad_size
+	y1 = ysize-pad_size
 
-def get_chips_padding(path_image, size = 100, start_perc_positions = [(0,0)], rotate = True, flip = True, nodata_value = 0, remove_chips_wnodata=False):
-	data_result = []
-	window_result = []
+	chip_expect = data[last_band:nbands, x0:x1, y0:y1]
+	chip_data = data[0:last_band, :, :]
 
-	for start_perc_x, start_perc_y in start_perc_positions:
-		pad_x = int(size * (start_perc_x / 100.0))
-		pad_y = int(size * (start_perc_y / 100.0))
-		
-		data_aux, windows_aux = get_chips(path_image, pad_x = pad_x, pad_y = pad_y, size = size, nodata_value=nodata_value, remove_chips_wnodata=remove_chips_wnodata)
-		
-		data_result = data_result + data_aux
-		window_result = window_result + windows_aux
+	return chip_data, chip_expect
 
-	if(rotate):
-		listas_resultado_090 = [np.rot90(m, k=1, axes=(1,2)) for m in data_result]
-		listas_resultado_180 = [np.rot90(m, k=2, axes=(1,2)) for m in data_result]
-		listas_resultado_270 = [np.rot90(m, k=3, axes=(1,2)) for m in data_result]
-		
-		data_result = data_result + listas_resultado_090 + listas_resultado_180 + listas_resultado_270
-		
-	if(flip):
-		data_result = [np.fliplr(m) for m in data_result]
-		
-	return np.transpose(np.stack(data_result), [0,2,3,1]), window_result
+def get_chips(data, chip_size = 388, pad_size = 92, x_offset = 0, y_offset = 0, nodata_value = 0, remove_chips_wnodata=False):
 
-def get_input_data(img_path, nodata_value, ninput_bands, chip_size, padding_offset, seed):
+	data = np.pad(data, [(0,0), (pad_size, pad_size), (pad_size, pad_size)], mode='reflect')
+	_, x_size, y_size = data.shape
+
+	x_start = pad_size + x_offset
+	x_end = x_size - pad_size
+
+	y_start = pad_size + y_offset
+	y_end = y_size - pad_size
+
+	chip_data_list = []
+	chip_expect_list = []
+
+	for x0 in range(x_start, x_end, chip_size):
+		
+		x0_pad, x1_pad = pad_index(x0, x_size, chip_size, pad_size)
+
+		for y0 in range(y_start, y_end, chip_size):
+			
+			y0_pad, y1_pad = pad_index(y0, y_size, chip_size, pad_size)
+			chip_data, chip_expect = split_data( data[:, x0_pad:x1_pad, y0_pad:y1_pad], pad_size )
+			
+			_, xsize, ysize = chip_expect.shape
+
+			if (chip_size == xsize and chip_size == ysize) and (not remove_chips_wnodata or float(np.min(chip_expect)) != float(nodata_value)):
+				if(float(np.max(chip_expect)) == float(1.0)): # Only include chips with some object (pixels == 1)
+					chip_data_list.append(chip_data)
+					chip_expect_list.append(chip_expect)
+
+	return np.stack(chip_data_list), np.stack(chip_expect_list)
+
+def rotate_flip_chips(data, rotate = True, flip = True):
+	result = [ data ]
+
+	if rotate:
+		result = result + [ np.rot90(data, k=k, axes=(2,3)) for k in [1,2,3] ]
+
+	if flip:
+		result = result + [np.fliplr(r_data) for r_data in result] # Band flip
+
+	return np.concatenate(result)
+
+def get_chips_with_augmentation(data, chip_size = 572, pad_size = 388, offset_list = [(0,0)], rotate = True, flip = True, nodata_value = 0, remove_chips_wnodata=False):
+	
+	chips_data_list = []
+	chips_expect_list = []
+
+	for x_offset_percent, y_offset_percent in offset_list:
+		x_offset = int(chip_size * (x_offset_percent / 100.0))
+		y_offset = int(chip_size * (y_offset_percent / 100.0))
+		
+		chips_data, chips_expect = get_chips(data, x_offset = x_offset, y_offset = y_offset, chip_size = chip_size, pad_size = pad_size,
+																		nodata_value=nodata_value, remove_chips_wnodata=remove_chips_wnodata)
+
+		chips_data_list.append(chips_data)
+		chips_expect_list.append(chips_expect)
+
+	data = None
+	chips_data = rotate_flip_chips( np.concatenate(chips_data_list), rotate, flip)
+	chips_expect = rotate_flip_chips( np.concatenate(chips_expect_list), rotate, flip)
+
+	return np.transpose(chips_data, [0,2,3,1]), np.transpose(chips_expect, [0,2,3,1])
+
+def get_train_test_data(img_path, nodata_value, ninput_bands, chip_size, pad_size, seed):
 	
 	npz_path = os.path.splitext(img_path)[0] + '.npz'
-
-	#padding_list = [(0,0), (0,padding_offset), (padding_offset, 0), (padding_offset,padding_offset)]
-	padding_list = [(0,0), (padding_offset,padding_offset)]
+	offset_list = [(0,0), (50,50)]
 
 	if os.path.isfile(npz_path):
 		print("Reading from cache " + npz_path + "...")
 		data = np.load(npz_path)
-		input_data = data['input'].reshape(-1, chip_size, chip_size, ninput_bands)
+		chips_data = data['chips_data'].reshape(-1, (chip_size+2*pad_size), (chip_size+2*pad_size), ninput_bands-1).astype(np.float32)
+		chips_expect = data['chips_expect'].reshape(-1, chip_size, chip_size, 1).astype(np.float32)
 	else:
 		print("Reading image " + img_path + "...")
-		input_data, _ = get_chips_padding(img_path, size=chip_size, start_perc_positions=padding_list, rotate=False, flip=True, \
-															nodata_value=nodata_value, remove_chips_wnodata=True)
-		print(input_data.shape)
+		gtif = gdal.Open(img_path)
+		img_data = gtif.ReadAsArray(0, 0, gtif.RasterXSize, gtif.RasterYSize)
+
+		chips_data, chips_expect = get_chips_with_augmentation(img_data, chip_size=chip_size, pad_size = pad_size, \
+														offset_list=offset_list, rotate=False, flip=True, \
+														nodata_value=nodata_value, remove_chips_wnodata=True)
+
 		print("Saving in cache " + npz_path + "...")
-		np.savez_compressed(npz_path, input=input_data)
+		np.savez_compressed(npz_path, chips_data=chips_data, chips_expect=chips_expect)
 
-	x_train = input_data[:,:,:, 0:(ninput_bands-1)]
-	y_train = input_data[:,:,:, (ninput_bands-1):ninput_bands]
-
-	nsamples, _, _, channels = x_train.shape
-	img_size = chip_size
-
-	train_data, test_data, train_labels, test_labels = train_test_split(x_train, y_train, test_size=0.3, random_state=seed)
-	test_data, val_data, test_labels, val_labels = train_test_split(test_data, test_labels, test_size=0.5, random_state=seed)
+	train_data, test_data, train_expect, test_expect = train_test_split(chips_data, chips_expect, test_size=0.2, random_state=seed)
 
 	print('Train samples: ', len(train_data))
 	print('Test samples: ', len(test_data))
-	print('Validation samples: ', len(val_data))
 
-	return train_data, test_data, val_data, train_labels, test_labels, val_labels
+	return train_data, test_data, train_expect, test_expect
 
-def write_data(in_path_image, out_path_image, data, input_windows):
+def get_predict_data(input_img_ds, input_position, pad_size):
+	inp_x0 = input_position[0]
+	inp_x1 = input_position[1]
+	inp_y0 = input_position[2]
+	inp_y1 = input_position[3]
+
+	inp_xlen = inp_x1 - inp_x0
+	inp_ylen = inp_y1 - inp_y0
+
+	inp_x0pad = 0
+	inp_y0pad = 0
+	inp_x1pad = 0
+	inp_y1pad = 0
+	out_x0 = inp_x0 + pad_size
+	out_y0 = inp_y0 + pad_size
+
+	if (inp_x0 == 0):
+		inp_xlen = inp_xlen-pad_size
+		inp_x0pad = pad_size
+		out_x0 = 0
+
+	if (inp_y0 == 0):
+		inp_ylen = inp_ylen-pad_size
+		inp_y0pad = pad_size
+		out_y0 = 0
+
+	if (inp_x1 > input_img_ds.RasterXSize):
+		inp_xlen = inp_xlen-pad_size
+		inp_x1pad = pad_size
 	
-	in_dataset = dataset = rasterio.open(in_path_image)
-	out_dataset = rasterio.open(out_path_image, 'w', driver='GTiff', height=in_dataset.height, width=in_dataset.width, 
-										dtype=rasterio.ubyte, crs=in_dataset.crs, transform=in_dataset.transform, count=1)
-	
-	print("Writing " + str( len(input_windows) ) + " chips in file" + out_path_image)
-	for i in range(0, len(input_windows)):
-		chip = np.transpose(data[i], [2,0,1])
-		out_dataset.write(chip, window=input_windows[i])
+	if inp_y1 > input_img_ds.RasterYSize:
+		inp_ylen = inp_ylen-pad_size
+		inp_y1pad = pad_size
 
-def discretize_values(data, numberClass):
-	for clazz in range(1, (numberClass + 1) ):
-		if clazz == 1:
+	chip_data = input_img_ds.ReadAsArray(inp_x0, inp_y0, inp_xlen, inp_ylen)
+	chip_data = np.pad(chip_data, [(0,0), (inp_y0pad, inp_y1pad), (inp_x0pad, inp_x1pad)], mode='reflect')
+	chip_data = np.transpose(chip_data, [1,2,0])
+
+	return chip_data, [out_x0, out_y0]
+
+def get_predict_positions(x_size, y_size, chip_size = 388, pad_size = 92, x_offset = 0, y_offset = 0):
+
+	x_start = pad_size + x_offset
+	x_end = x_size - pad_size
+
+	y_start = pad_size + y_offset
+	y_end = y_size - pad_size
+
+	input_positions = []
+
+	for x0 in range(x_start, x_end, chip_size):
+		
+		x0_pad, x1_pad = pad_index(x0, x_size, chip_size, pad_size)
+
+		for y0 in range(y_start, y_end, chip_size):
+			
+			y0_pad, y1_pad = pad_index(y0, y_size, chip_size, pad_size)
+			input_positions.append([x0_pad, x1_pad, y0_pad, y1_pad])
+				
+	return input_positions
+
+def memory_percentage():
+	memory = psutil.virtual_memory()
+	return memory[2]
+
+def discretize_values(data, numberClass, startValue = 0):
+	for clazz in range(startValue, (numberClass + 1) ):
+		if clazz == startValue:
 			classFilter = (data <= clazz + 0.5)
 		elif  clazz == numberClass:
 			classFilter = (data > clazz - 0.5)
@@ -118,3 +203,21 @@ def discretize_values(data, numberClass):
 		data[classFilter] = clazz
 
 	return data.astype(np.uint8)
+
+def create_output_file(base_filepath, out_filepath, dataType = gdal.GDT_Int16, imageFormat = 'GTiff'):
+    
+  driver = gdal.GetDriverByName(imageFormat)
+  base_ds = gdal.Open(base_filepath)
+
+  x_start, pixel_width, _, y_start, _, pixel_height = base_ds.GetGeoTransform()
+  x_size = base_ds.RasterXSize 
+  y_size = base_ds.RasterYSize
+  
+  out_srs = osr.SpatialReference()
+  out_srs.ImportFromWkt(base_ds.GetProjectionRef())
+
+  output_img_ds = driver.Create(out_filepath, x_size, y_size, 1, dataType, ['COMPRESS=LZW'])
+  output_img_ds.SetGeoTransform((x_start, pixel_width, 0, y_start, 0, pixel_height))
+  output_img_ds.SetProjection(out_srs.ExportToWkt())
+
+  return output_img_ds

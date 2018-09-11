@@ -1,87 +1,94 @@
 #!/usr/bin/python
-
 from osgeo import gdal
 from rios import applier
 from rios import fileinfo
-from scipy.signal import savgol_filter
+import multiprocessing
 import sys
 import numpy as np
 
-image = sys.argv[1]
+image1 = sys.argv[1]
+image2 = sys.argv[2]
+
+hasReferenceImage = (len(sys.argv) == 4)
+
+if(hasReferenceImage):
+	referenceImage = sys.argv[3]
+	outputImage = sys.argv[4]
+else:
+	outputImage = sys.argv[3]
 
 infiles = applier.FilenameAssociations()
 outfiles = applier.FilenameAssociations()
 otherargs = applier.OtherInputs()
 
-infiles.image = image + '.vrt'
-infiles.labels = image + '_output.tif'
-
-outfiles.normalized_stacked = image + '.img'
+infiles.image1 = image1
+infiles.image2 = image2
+outfiles.normalized_stacked = outputImage
 
 def stats(filename, nodata, i):
 
 	gtif = gdal.Open(filename)
-	band = gtif.GetRasterBand(i)
-	band.SetNoDataValue(nodata)
-	stats = band.ComputeStatistics(False)
-	
+	data = gtif.GetRasterBand(i).ReadAsArray(0,0, gtif.RasterXSize, gtif.RasterYSize)
+
 	return {
-		'min':stats[0],
-		'max': stats[1],
-		'mean': stats[2],
-		'stddev': stats[3],
+		'min': np.min(data),
+		'max': np.max(data),
+		'mean': np.mean(data),
+		'median': np.median(data),
+		'stddev': np.std(data),
 		'nodata': nodata
 	}
 
 def normalize(block, stats, outputNodata):
-	block[block != stats['nodata']] = 2 * (( block[block != stats['nodata']] - stats['min']) / (stats['max'] - stats['min'])) - 1
-	block[block == stats['nodata']] = outputNodata
+	
+	validPixels = (block != stats['nodata'])
+	block[validPixels] = (block[validPixels] - stats['median']) / stats['stddev']
+	block[(block == stats['nodata'])] = outputNodata
+
 	return block
-
-def reclass_values(data, labels_origin, labels_target):
-
-	if len(labels_origin) != len(labels_target):
-		raise Exception(
-		'reclass_values: "labels_origin" and "labels_target" must have the same length')
-
-	def reclass(a):
-		b = np.copy(a)
-		for l_ori, l_tar in zip(labels_origin, labels_target):
-			b = np.where(a == l_ori, l_tar, b)
-		return b
-
-	return np.apply_along_axis(reclass,  0, data)
-
 
 def filter(info, inputs, outputs, otherargs):
 	
 	print("Processing status " + str(info.getPercent()) + "%")
 
-	norm_blue = normalize(inputs.image[0:1,:,:].astype('Float32'), otherargs.blue_stats, otherargs.output_nodata)
-	norm_green = normalize(inputs.image[1:2,:,:].astype('Float32'), otherargs.green_stats, otherargs.output_nodata)
-	norm_red = normalize(inputs.image[2:3,:,:].astype('Float32'), otherargs.red_stats, otherargs.output_nodata)
-	norm_nir = normalize(inputs.image[3:4,:,:].astype('Float32'), otherargs.nir_stats, otherargs.output_nodata)
+	norm_blue1 = normalize(inputs.image1[0:1,:,:].astype('Float32'), otherargs.stats_blue1, otherargs.output_nodata)
+	norm_green1 = normalize(inputs.image1[1:2,:,:].astype('Float32'), otherargs.stats_green1, otherargs.output_nodata)
+	norm_red1 = normalize(inputs.image1[2:3,:,:].astype('Float32'), otherargs.stats_red1, otherargs.output_nodata)
+	norm_nir1 = normalize(inputs.image1[3:4,:,:].astype('Float32'), otherargs.stats_nir1, otherargs.output_nodata)
 
-	labels = inputs.labels.astype('Float32')
+	norm_blue2 = normalize(inputs.image2[0:1,:,:].astype('Float32'), otherargs.stats_blue2, otherargs.output_nodata)
+	norm_green2 = normalize(inputs.image2[1:2,:,:].astype('Float32'), otherargs.stats_green2, otherargs.output_nodata)
+	norm_red2 = normalize(inputs.image2[2:3,:,:].astype('Float32'), otherargs.stats_red2, otherargs.output_nodata)
+	norm_nir2 = normalize(inputs.image2[3:4,:,:].astype('Float32'), otherargs.stats_nir2, otherargs.output_nodata)
 
-	labels = reclass_values(labels, [0,1,10,22,26], [-2,1,2,3,4])
-	# labels[labels == 0] = -2
-	# labels[labels == 3] = 1
-	# labels[labels == 12] = 2
-	# labels[labels == 25] = 3
-	# labels[labels == 26] = 4
+	outputBands = [
+		norm_blue1, norm_green1, norm_red1, norm_nir1,
+		norm_blue2, norm_green2, norm_red2, norm_nir2
+	]
+
+	if otherargs.hasReferenceImage:
+		outputBands.append(inputs.referenceImage.astype('Float32'))
 	
-	outputs.normalized_stacked = np.concatenate((norm_blue, norm_green, norm_red, norm_nir, labels))
+	outputs.normalized_stacked = np.concatenate(outputBands);
 
-otherargs.output_nodata = -2
-otherargs.blue_stats = stats(infiles.image, 0, 1)
-otherargs.green_stats = stats(infiles.image, 0, 2)
-otherargs.red_stats = stats(infiles.image, 0, 3)
-otherargs.nir_stats = stats(infiles.image, 0, 4)
+otherargs.output_nodata = -10
+otherargs.stats_blue1 = stats(infiles.image1, 0, 1)
+otherargs.stats_green1 = stats(infiles.image1, 0, 2)
+otherargs.stats_red1 = stats(infiles.image1, 0, 3)
+otherargs.stats_nir1 = stats(infiles.image1, 0, 4)
+otherargs.stats_blue2 = stats(infiles.image2, 0, 1)
+otherargs.stats_green2 = stats(infiles.image2, 0, 2)
+otherargs.stats_red2 = stats(infiles.image2, 0, 3)
+otherargs.stats_nir2 = stats(infiles.image2, 0, 4)
+otherargs.hasReferenceImage = hasReferenceImage
 
 controls = applier.ApplierControls()
-controls.setNumThreads(8);
-controls.referenceImage = infiles.labels
+controls.setNumThreads(multiprocessing.cpu_count());
+
+if(hasReferenceImage):
+	infiles.referenceImage = referenceImage
+	controls.referenceImage = infiles.referenceImage
+
 controls.setJobManagerType('multiprocessing')
 
 applier.apply(filter, infiles, outfiles, otherargs, controls=controls)
