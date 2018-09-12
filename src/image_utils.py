@@ -98,10 +98,10 @@ def get_chips_with_augmentation(data, chip_size = 572, pad_size = 388, offset_li
 
 	return np.transpose(chips_data, [0,2,3,1]), np.transpose(chips_expect, [0,2,3,1])
 
-def get_train_test_data(img_path, nodata_value, ninput_bands, chip_size, pad_size, seed):
+def get_train_test_data(img_path, nodata_value, ninput_bands, chip_size, pad_size, seed, \
+													offset_list=[(0,0)], rotate=False, flip=False):
 	
 	npz_path = os.path.splitext(img_path)[0] + '.npz'
-	offset_list = [(0,0), (50,50)]
 
 	if os.path.isfile(npz_path):
 		print("Reading from cache " + npz_path + "...")
@@ -114,7 +114,7 @@ def get_train_test_data(img_path, nodata_value, ninput_bands, chip_size, pad_siz
 		img_data = gtif.ReadAsArray(0, 0, gtif.RasterXSize, gtif.RasterYSize)
 
 		chips_data, chips_expect = get_chips_with_augmentation(img_data, chip_size=chip_size, pad_size = pad_size, \
-														offset_list=offset_list, rotate=False, flip=True, \
+														offset_list=offset_list, rotate=rotate, flip=flip, \
 														nodata_value=nodata_value, remove_chips_wnodata=True)
 
 		print("Saving in cache " + npz_path + "...")

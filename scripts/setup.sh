@@ -8,8 +8,13 @@ sudo apt install -y git wget python3 python3-gdal gdal-bin
 
 echo "Setup Python dependencies packages"
 
-sudo pip3 install tensorflow-gpu==1.5.0
-sudo pip3 install pillow
-sudo pip install download https://bitbucket.org/chchrsc/rios/downloads/rios-1.4.5.tar.gz
+sudo pip3 install numpy
+sudo pip3 install tensorflow-gpu==1.7.0 
+sudo pip3 install scikit-image
+sudo pip3 install scikit-learn 
+sudo pip3 install matplotlib 
+sudo pip3 install seaborn
+sudo pip3 install psutil
+sudo pip3 install download https://bitbucket.org/chchrsc/rios/downloads/rios-1.4.5.tar.gz
 
 echo "Installation Done"
