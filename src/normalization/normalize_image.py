@@ -9,7 +9,7 @@ import numpy as np
 image1 = sys.argv[1]
 image2 = sys.argv[2]
 
-hasReferenceImage = (len(sys.argv) == 4)
+hasReferenceImage = (len(sys.argv) == 5)
 
 if(hasReferenceImage):
 	referenceImage = sys.argv[3]
