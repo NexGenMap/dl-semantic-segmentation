@@ -60,7 +60,8 @@ def get_chips(data, chip_size = 388, pad_size = 92, x_offset = 0, y_offset = 0, 
 			_, xsize, ysize = chip_expect.shape
 
 			if (chip_size == xsize and chip_size == ysize) and (not remove_chips_wnodata or float(np.min(chip_expect)) != float(nodata_value)):
-				if(float(np.max(chip_expect)) == float(1.0)): # Only include chips with some object (pixels == 1)
+				if(float(np.max(chip_expect)) > float(0.0)): # Only include chips with some object
+					chip_expect[ chip_expect != 1] = 0 # convert all other class to pixel == 0
 					chip_data_list.append(chip_data)
 					chip_expect_list.append(chip_expect)
 
@@ -74,6 +75,7 @@ def rotate_flip_chips(data, rotate = True, flip = True):
 
 	if flip:
 		result = result + [np.fliplr(r_data) for r_data in result] # Band flip
+		#result = result + [np.transpose(r_data, axes=[2,3]) for r_data in result] # 
 
 	return np.concatenate(result)
 

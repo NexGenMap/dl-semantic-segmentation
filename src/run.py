@@ -174,11 +174,11 @@ params = {
 	
 	'seed': 1989,
 	'batch_size': 32,
-	'num_epochs': 200,
+	'num_epochs': 100,
 	'model_dir': 'logs_bebedouros',
 
 	'dropout_rate': 0.5,
-	'learning_rate': 0.00001,
+	'learning_rate': 0.00005,
 	'tensorboard_maxoutput': 2,
 	'l2_regularizer': 0.5
 }
