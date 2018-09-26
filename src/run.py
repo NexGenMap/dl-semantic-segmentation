@@ -169,7 +169,7 @@ params = {
 	'pad_size': 93,
 	'chip_size': 100,
 	'chip_offsets': [(0,0), (50,50)],
-	'chip_rotate': False,
+	'chip_rotate': True,
 	'chip_flip': True,
 	
 	'seed': 1989,

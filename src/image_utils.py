@@ -3,9 +3,10 @@ import gdal
 import osr
 import numpy as np
 import psutil
+import gc
+import json
 
 import math
-from sklearn.model_selection import train_test_split
 
 def pad_index(index, dim_size, chip_size, pad_size):
 
@@ -19,7 +20,7 @@ def pad_index(index, dim_size, chip_size, pad_size):
 	return i0, i1
 
 def split_data(data, pad_size):
-	nbands, xsize, ysize = data.shape
+	xsize, ysize, nbands = data.shape
 
 	last_band = (nbands-1)
 	
@@ -29,100 +30,131 @@ def split_data(data, pad_size):
 	y0 = pad_size
 	y1 = ysize-pad_size
 
-	chip_expect = data[last_band:nbands, x0:x1, y0:y1]
-	chip_data = data[0:last_band, :, :]
+	chip_expect = data[x0:x1, y0:y1, last_band:nbands]
+	chip_data = data[:, :, 0:last_band]
 
 	return chip_data, chip_expect
 
-def get_chips(data, chip_size = 388, pad_size = 92, x_offset = 0, y_offset = 0, nodata_value = 0, remove_chips_wnodata=False):
-
-	data = np.pad(data, [(0,0), (pad_size, pad_size), (pad_size, pad_size)], mode='reflect')
-	_, x_size, y_size = data.shape
-
-	x_start = pad_size + x_offset
-	x_end = x_size - pad_size
-
-	y_start = pad_size + y_offset
-	y_end = y_size - pad_size
-
-	chip_data_list = []
-	chip_expect_list = []
-
-	for x0 in range(x_start, x_end, chip_size):
-		
-		x0_pad, x1_pad = pad_index(x0, x_size, chip_size, pad_size)
-
-		for y0 in range(y_start, y_end, chip_size):
-			
-			y0_pad, y1_pad = pad_index(y0, y_size, chip_size, pad_size)
-			chip_data, chip_expect = split_data( data[:, x0_pad:x1_pad, y0_pad:y1_pad], pad_size )
-			
-			_, xsize, ysize = chip_expect.shape
-
-			if (chip_size == xsize and chip_size == ysize) and (not remove_chips_wnodata or float(np.min(chip_expect)) != float(nodata_value)):
-				if(float(np.max(chip_expect)) > float(0.0)): # Only include chips with some object
-					chip_expect[ chip_expect != 1] = 0 # convert all other class to pixel == 0
-					chip_data_list.append(chip_data)
-					chip_expect_list.append(chip_expect)
-
-	return np.stack(chip_data_list), np.stack(chip_expect_list)
-
-def rotate_flip_chips(data, rotate = True, flip = True):
+def chip_augmentation(data, rotate = True, flip = True):
 	result = [ data ]
 
 	if rotate:
-		result = result + [ np.rot90(data, k=k, axes=(2,3)) for k in [1,2,3] ]
+		result = result + [ np.rot90(data, k=k, axes=(0,1)) for k in [1,2,3] ]
 
 	if flip:
-		result = result + [np.fliplr(r_data) for r_data in result] # Band flip
-		#result = result + [np.transpose(r_data, axes=[2,3]) for r_data in result] # 
+		result = result + [np.flip(data, axis=k) for k in [0,1] ]
 
-	return np.concatenate(result)
+	return result
 
-def get_chips_with_augmentation(data, chip_size = 572, pad_size = 388, offset_list = [(0,0)], rotate = True, flip = True, nodata_value = 0, remove_chips_wnodata=False):
+def chip_generation(img_path, nodata_value, chip_size, pad_size, offset_list=[(0,0)], \
+							rotate=False, flip=False, remove_chips_wnodata=True, 
+							chips_data_np = None, chips_expect_np = None):
 	
-	chips_data_list = []
-	chips_expect_list = []
+	index = 0
+	chip_data_list = []
+	chip_expect_list = []
+	input_img_ds = gdal.Open(img_path)
 
 	for x_offset_percent, y_offset_percent in offset_list:
 		x_offset = int(chip_size * (x_offset_percent / 100.0))
 		y_offset = int(chip_size * (y_offset_percent / 100.0))
-		
-		chips_data, chips_expect = get_chips(data, x_offset = x_offset, y_offset = y_offset, chip_size = chip_size, pad_size = pad_size,
-																		nodata_value=nodata_value, remove_chips_wnodata=remove_chips_wnodata)
 
-		chips_data_list.append(chips_data)
-		chips_expect_list.append(chips_expect)
+		input_positions = get_predict_positions(input_img_ds.RasterXSize, input_img_ds.RasterYSize, \
+																						chip_size, pad_size, x_offset, y_offset)
 
-	data = None
-	chips_data = rotate_flip_chips( np.concatenate(chips_data_list), rotate, flip)
-	chips_expect = rotate_flip_chips( np.concatenate(chips_expect_list), rotate, flip)
+		for input_position in input_positions:
+			chip_data, _ = get_predict_data(input_img_ds, input_position, pad_size)
 
-	return np.transpose(chips_data, [0,2,3,1]), np.transpose(chips_expect, [0,2,3,1])
+			chip_data, chip_expect = split_data(chip_data, pad_size)
+			xsize, ysize, _ = chip_expect.shape
+			
+			if (chip_size == xsize and chip_size == ysize) and (not remove_chips_wnodata or float(np.min(chip_expect)) != float(nodata_value)):
+				if(float(np.max(chip_expect)) > float(0.0)): # Only include chips with some object
+					chip_expect[ chip_expect != 1] = 0 # convert all other class to pixel == 0
+					chip_data_aux = chip_augmentation(chip_data, rotate, flip)
+					chip_expect_aux = chip_augmentation(chip_expect, rotate, flip)
+					nchips = len(chip_data_aux)
+
+					if (chips_data_np is not None):
+						chips_data_np[index:index+nchips,:,:,:] = np.stack(chip_data_aux)
+						chips_expect_np[index:index+nchips,:,:,:] = np.stack(chip_expect_aux)
+					else:
+						chip_data_list = chip_data_list + chip_data_aux
+						chip_expect_list = chip_expect_list + chip_expect_aux
+
+					index = index + nchips
+
+	return chip_data_list, chip_expect_list
+
+def create_memmap_np(memmap_path, chips_list):
+	
+	nsamples = len(chips_list)
+	width, height, nbands = chips_list[0].shape
+
+	del chips_list
+	gc.collect()
+
+	return np.memmap(memmap_path, dtype='float32', mode='w+', shape=(nsamples, width, height, nbands))
+
+def train_test_split(data_path, expect_path, metadata_path, test_size=0.2):
+	
+	chips_mtl = json.load(open(metadata_path, 'r'))
+	nsamples = chips_mtl['nsamples']
+
+	nsamples_test = int(nsamples * test_size)
+	nsamples_train = nsamples - nsamples_test
+	
+	shape_train_data = (nsamples_train, chips_mtl['data_size'], chips_mtl['data_size'], chips_mtl['data_nbands'])
+	shape_train_expect = (nsamples_train, chips_mtl['expe_size'], chips_mtl['expe_size'], chips_mtl['expe_nbands'])
+
+	shape_test_data = (nsamples_test, chips_mtl['data_size'], chips_mtl['data_size'], chips_mtl['data_nbands'])
+	shape_test_expect = (nsamples_test, chips_mtl['expe_size'], chips_mtl['expe_size'], chips_mtl['expe_nbands'])
+
+	offset_test_data = 4*nsamples_train*chips_mtl['data_size']*chips_mtl['data_size']*chips_mtl['data_nbands']
+	offset_test_expect = 4*nsamples_train*chips_mtl['expe_size']*chips_mtl['expe_size']*chips_mtl['expe_nbands']
+
+	train_data = np.memmap(data_path, dtype='float32', mode='r', shape=shape_train_data)
+	train_expect = np.memmap(expect_path, dtype='float32', mode='r', shape=shape_train_expect)
+
+	test_data = np.memmap(data_path, dtype='float32', mode='r', offset=offset_test_data, shape=shape_test_data)
+	test_expect = np.memmap(expect_path, dtype='float32', mode='r', offset=offset_test_expect, shape=shape_test_expect)
+
+	return train_data, test_data, train_expect, test_expect
 
 def get_train_test_data(img_path, nodata_value, ninput_bands, chip_size, pad_size, seed, \
-													offset_list=[(0,0)], rotate=False, flip=False):
+													offset_list=[(0,0)], rotate=False, flip=False, remove_chips_wnodata=True):
 	
 	npz_path = os.path.splitext(img_path)[0] + '.npz'
+	data_path = os.path.splitext(img_path)[0] + '_data.dat'
+	expect_path = os.path.splitext(img_path)[0] + '_exp.dat'
+	metadata_path = os.path.splitext(img_path)[0] + '_data.json'
 
-	if os.path.isfile(npz_path):
-		print("Reading from cache " + npz_path + "...")
-		data = np.load(npz_path)
-		chips_data = data['chips_data'].reshape(-1, (chip_size+2*pad_size), (chip_size+2*pad_size), ninput_bands-1).astype(np.float32)
-		chips_expect = data['chips_expect'].reshape(-1, chip_size, chip_size, 1).astype(np.float32)
-	else:
-		print("Reading image " + img_path + "...")
-		gtif = gdal.Open(img_path)
-		img_data = gtif.ReadAsArray(0, 0, gtif.RasterXSize, gtif.RasterYSize)
+	if not os.path.isfile(data_path):
+		print("Creating chips from image " + img_path + "...")
+	
+		chip_data_list, chip_expect_list = chip_generation(img_path, nodata_value, chip_size, pad_size, offset_list, rotate, flip, remove_chips_wnodata)
 
-		chips_data, chips_expect = get_chips_with_augmentation(img_data, chip_size=chip_size, pad_size = pad_size, \
-														offset_list=offset_list, rotate=rotate, flip=flip, \
-														nodata_value=nodata_value, remove_chips_wnodata=True)
+		chips_data = create_memmap_np(data_path, chip_data_list)
+		chips_expect = create_memmap_np(expect_path, chip_expect_list)
 
-		print("Saving in cache " + npz_path + "...")
-		np.savez_compressed(npz_path, chips_data=chips_data, chips_expect=chips_expect)
+		chip_generation(img_path, nodata_value, chip_size, pad_size, offset_list, rotate, flip, remove_chips_wnodata, chips_data, chips_expect)
 
-	train_data, test_data, train_expect, test_expect = train_test_split(chips_data, chips_expect, test_size=0.2, random_state=seed)
+		chips_mtl = {
+			"nsamples": chips_data.shape[0],
+			"data_size": chips_data.shape[1],
+			"data_nbands": chips_data.shape[3],
+			"expe_size": chips_expect.shape[1],
+			"expe_nbands": chips_expect.shape[3]
+		}
+
+		json.dump(chips_mtl, open(metadata_path, 'w'))
+		chips_data.flush()
+		chips_expect.flush()
+
+		del chips_data
+		del chips_expect
+
+	train_data, test_data, train_expect, test_expect = train_test_split(data_path, expect_path, metadata_path)
 
 	print('Train samples: ', len(train_data))
 	print('Test samples: ', len(test_data))
