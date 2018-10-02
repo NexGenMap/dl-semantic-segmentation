@@ -42,7 +42,8 @@ def chip_augmentation(data, rotate = True, flip = True):
 		result = result + [ np.rot90(data, k=k, axes=(0,1)) for k in [1,2,3] ]
 
 	if flip:
-		result = result + [np.flip(data, axis=k) for k in [0,1] ]
+		#result = result + [np.flip(result, axis=k) for k in [0,1] ] 
+		result = result + [np.fliplr(r_data) for r_data in result] 
 
 	return result
 
@@ -96,6 +97,11 @@ def create_memmap_np(memmap_path, chips_list):
 
 	return np.memmap(memmap_path, dtype='float32', mode='w+', shape=(nsamples, width, height, nbands))
 
+def swap_elements(np_array, idx1, idx2):
+	element_aux = np_array[idx1,:,:,:]
+	np_array[idx1,:,:,:] = np_array[idx2,:,:,:]
+	np_array[idx2,:,:,:] = element_aux
+
 def train_test_split(data_path, expect_path, metadata_path, test_size=0.2):
 	
 	chips_mtl = json.load(open(metadata_path, 'r'))
@@ -118,7 +124,7 @@ def train_test_split(data_path, expect_path, metadata_path, test_size=0.2):
 
 	test_data = np.memmap(data_path, dtype='float32', mode='r', offset=offset_test_data, shape=shape_test_data)
 	test_expect = np.memmap(expect_path, dtype='float32', mode='r', offset=offset_test_expect, shape=shape_test_expect)
-
+		
 	return train_data, test_data, train_expect, test_expect
 
 def get_train_test_data(img_path, nodata_value, ninput_bands, chip_size, pad_size, seed, \
@@ -146,6 +152,14 @@ def get_train_test_data(img_path, nodata_value, ninput_bands, chip_size, pad_siz
 			"expe_size": chips_expect.shape[1],
 			"expe_nbands": chips_expect.shape[3]
 		}
+
+		np.random.seed(seed)
+		rand_idxs = np.random.choice(chips_mtl['nsamples'], chips_mtl['nsamples'])
+		print("Shuffling chips...")
+		for i1 in range(chips_mtl['nsamples']):
+			i2 = rand_idxs[i1]
+			chips_data[i2,:,:,:], chips_data[i1,:,:,:] = chips_data[i1,:,:,:], chips_data[i2,:,:,:]
+			chips_expect[i2,:,:,:], chips_expect[i1,:,:,:] = chips_expect[i1,:,:,:], chips_expect[i2,:,:,:]
 
 		json.dump(chips_mtl, open(metadata_path, 'w'))
 		chips_data.flush()

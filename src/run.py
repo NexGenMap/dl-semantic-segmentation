@@ -168,14 +168,14 @@ params = {
 	'nodata_value': -10,
 	'pad_size': 93,
 	'chip_size': 100,
-	'chip_offsets': [(0,0), (50,50)],
+	'chip_offsets': [(0,0), (50,0), (0,50), (50,50)],
 	'chip_rotate': True,
 	'chip_flip': True,
 	
 	'seed': 1989,
 	'batch_size': 32,
 	'num_epochs': 100,
-	'model_dir': 'logs_bebedouros',
+	'model_dir': 'logs_pasto_homogeneo',
 
 	'dropout_rate': 0.5,
 	'learning_rate': 0.00005,
