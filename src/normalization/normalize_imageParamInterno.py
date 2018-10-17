@@ -55,7 +55,7 @@ def filter(info, inputs, outputs, otherargs):
 	
 	outputs.normalized_stacked = np.concatenate(outputBands);
 
-pathImgs = '/dataset1/nextgenmap-dataset/v3/Caatinga/'
+pathImgs = '/dataset1/nextgenmap-dataset/v3/'
 pathRef = '/dataset1/nextgenmap-samples/unet/'
 refSaida = "/root/SB-24-Z-D_classCampos.img"
 image1 = pathImgs + "SB-24-Z-D-2017-11-01-2017-12-01.vrt" #sys.argv[1]
