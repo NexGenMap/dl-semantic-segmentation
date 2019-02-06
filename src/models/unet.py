@@ -80,6 +80,10 @@ def description(features, labels, mode, params, config):
 	
 	input_data = features['data']
 
+	input_data = tf.multiply(tf.to_float(input_data), params['scale_factor'])
+	if mode != tf.estimator.ModeKeys.PREDICT:
+		labels = tf.to_float(labels)
+
 	conv1, pool1 = conv_conv_pool(input_data, [64, 64], mode, params, name=1)
 	conv2, pool2 = conv_conv_pool(pool1, [128, 128], mode, params, name=2)
 	conv3, pool3 = conv_conv_pool(pool2, [256, 256], mode, params, name=3)
