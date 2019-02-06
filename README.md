@@ -9,23 +9,23 @@ Download the Forest toy data in https://www.lapig.iesa.ufg.br/lapig/nextgenmap-d
 ```sh
 $ ./standardize_imgs.py -n 0 -b 1 2 3 4 -i forest_toy/raw_data/mosaic_201709.tif forest_toy/raw_data/mosaic_201801.tif -o forest_toy/stand_data
 ```
-1. Stack the standardized image and the forest map (e.i. the reference data):
+2. Stack the standardized image and the forest map (e.i. the reference data):
 ```sh
 $ ./stack_imgs.py -i forest_toy/stand_data/mosaic_201709_stand.tif -r forest_toy/raw_data/forest_201709.tif -o forest_toy/stand_data/forest_201709_model_input.vrt
 ```
-1. Generate the chips (i.e. a set of pixels with regular squared size) without data augmentation (see usages):
+3. Generate the chips (i.e. a set of pixels with regular squared size) without data augmentation (see usages):
 ```sh
-$ ./generate_chips.py -f 0,0 -r false -l false -i forest_toy/stand_data/forest_201709_model_input.vrt -o forest_toy/chips
+$ ./generate_chips.py forest_toy/stand_data/forest_201709_model_input.vrt -o forest_toy/chips
 ```
-1. Train a U-net model:
+4. Train a U-net model:
 ```sh
 $ ./evaluate_model.py -i forest_toy/chips -o forest_toy/model
 ```
-1. Evaluate the trained model:
+5. Evaluate the trained model:
 ```sh
 $ ./evaluate_model.py -m forest_toy/model
 ```
-1. Classify the other image:
+6. Classify the other image:
 ```sh
 $ ./classify_imgs.py -m forest_toy/model -i forest_toy/raw_data/mosaic_201801.tif -o forest_toy/result
 ```
