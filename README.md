@@ -1,7 +1,7 @@
 # dl-semantic-segmentation
 
 Deep-learning applied to semantic segmentation of remote sensing data, according to this workflow:
- alt tag](https://raw.githubusercontent.com/NexGenMap/dl-semantic-segmentation/master/docs/workflow.png)
+![alt tag](https://raw.githubusercontent.com/NexGenMap/dl-semantic-segmentation/master/docs/workflow.png)
 
 ## Workflow Execution (Forest toy data)
 Download the Forest toy data in https://www.lapig.iesa.ufg.br/lapig/nextgenmap-data/ and follow the instructions below:
