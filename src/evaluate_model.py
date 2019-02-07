@@ -20,7 +20,6 @@ def do_evaluation(estimator, input_data, input_expected, category, params):
 
 	pred_flat_array = []
 	ref_flat_array = []
-	mean_acc = []
 
 	for predict, expect in zip(predict_results, input_expected):
 		
@@ -32,9 +31,8 @@ def do_evaluation(estimator, input_data, input_expected, category, params):
 		pred_flat_array = np.append(pred_flat_array, pre_flat)
 		ref_flat_array = np.append(ref_flat_array, exp_flat)
 
-		mean_acc.append( accuracy_score(exp_flat, pre_flat) )
-
-	print(category + ' accurancy:',np.mean(mean_acc))
+	accuracy = accuracy_score(ref_flat_array, pred_flat_array)
+	print(category + ' accurancy:', accuracy)
 	print('\n--------------------------------------------------')
 	print('------------- '+category+' METRICS -------------')
 	print('--------------------------------------------------')

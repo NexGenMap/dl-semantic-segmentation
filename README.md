@@ -13,19 +13,27 @@ $ ./standardize_imgs.py -n 0 -b 1 2 3 4 -i forest_toy/raw_data/mosaic_201709.tif
 ```sh
 $ ./stack_imgs.py -i forest_toy/stand_data/mosaic_201709_stand.tif -r forest_toy/raw_data/forest_201709.tif -o forest_toy/stand_data/forest_201709_model_input.vrt
 ```
-3. Generate the chips (i.e. a set of pixels with regular squared size) without data augmentation (see usages):
+3. Generate the chips (i.e. a set of pixels with regular squared size) without data augmentation ([see usages](#usages)):
 ```sh
 $ ./generate_chips.py forest_toy/stand_data/forest_201709_model_input.vrt -o forest_toy/chips
 ```
-4. Train a U-net model:
+4. Train a U-net model, for 20 epochs, using default hyperparameter ([see usages](#usages)):
 ```sh
-$ ./evaluate_model.py -i forest_toy/chips -o forest_toy/model
+$ ./train_model.py -e 20 -i forest_toy/chips -o forest_toy/model/
+```
+* Follow the trainning process using tensorboard:
+```sh
+$ tensorboard --logdir=forest_toy/model/
 ```
 5. Evaluate the trained model:
 ```sh
 $ ./evaluate_model.py -m forest_toy/model
 ```
 6. Classify the other image:
+```sh
+$ ./classify_imgs.py -m forest_toy/model -i forest_toy/raw_data/mosaic_201801.tif -o forest_toy/result
+```
+* Check the classification result, forest_toy/result/mosaic_201801_pred.tif, in [QGIS](https://www.qgis.org):
 ```sh
 $ ./classify_imgs.py -m forest_toy/model -i forest_toy/raw_data/mosaic_201801.tif -o forest_toy/result
 ```
