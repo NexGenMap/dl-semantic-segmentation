@@ -4,7 +4,7 @@ Deep-learning applied to semantic segmentation of remote sensing data, according
 ![alt tag](https://raw.githubusercontent.com/NexGenMap/dl-semantic-segmentation/master/docs/workflow.png)
 
 ## Workflow Execution (Forest toy data)
-Download the Forest toy data in https://www.lapig.iesa.ufg.br/lapig/nextgenmap-data/ and follow the instructions below:
+Download the Forest toy data in https://storage.googleapis.com/nextgenmap-dataset/dl-semantic-segmentation/forest_toy.zip and follow the instructions below:
 1. Standardize the two images, the one will be used to train the model e another one that will be classified:
 ```sh
 $ ./standardize_imgs.py -n 0 -b 1 2 3 4 -i forest_toy/raw_data/mosaic_201709.tif forest_toy/raw_data/mosaic_201801.tif -o forest_toy/stand_data
