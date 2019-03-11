@@ -20,7 +20,7 @@ def save_object(filepath, obj):
 def basedir(filepath):
 	return os.path.dirname(filepath)
 
-def new_filepath(filepath, suffix='', ext=None, directory='.'):
+def new_filepath(filepath, suffix=None, ext=None, directory='.'):
 	
 	filename = ntpath.basename(filepath)
 
@@ -30,7 +30,12 @@ def new_filepath(filepath, suffix='', ext=None, directory='.'):
 	if (ext is None):
 		ext = filename_splited[1]
 	
-	filename = filename_noext + '_' + suffix + '.' + ext
+	if (suffix is None):
+		suffix = ''
+	else:
+		suffix = '_' + suffix
+
+	filename = filename_noext + suffix + '.' + ext
 
 	return os.path.join(directory, filename)
 

@@ -53,7 +53,7 @@ def create_vrt_bands(img_path, output_vrt, bands):
 def create_separate_bands(images, output_vrt, bands):
 	separate_bands = []
 
-	for img_path in args.images:
+	for img_path in images:
 		vrt_bands = create_vrt_bands(img_path, output_vrt, bands)
 		separate_bands += vrt_bands
 
@@ -68,7 +68,7 @@ def create_vrt_output(input_imgs, output_vrt, ref_img = None, bands = None):
 	if ref_img is not None:
 		separate_bands += [ref_img]
 
-		ref_extent, ref_pixel_size = reference_params(args.reference)
+		ref_extent, ref_pixel_size = reference_params(ref_img)
 
 		command += ["-te"]
 		command += ref_extent

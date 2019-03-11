@@ -62,7 +62,10 @@ if __name__ == "__main__":
 
 	image_utils.mkdirp(output_dir)
 	param_path = image_utils.new_filepath('train_params.dat', directory=output_dir)
+	chips_info_path = image_utils.new_filepath('chips_info.dat', directory=output_dir)
+	
 	image_utils.save_object(param_path, params)
+	image_utils.save_object(chips_info_path, params)
 
 	estimator = tf.estimator.Estimator(model_fn=md.description, params=params, model_dir=output_dir)
 	logging_hook = tf.train.LoggingTensorHook(tensors={'loss': 'cost/loss'}, every_n_iter=batch_size*4)

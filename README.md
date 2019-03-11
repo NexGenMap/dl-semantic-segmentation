@@ -1,39 +1,31 @@
 # dl-semantic-segmentation
 
 Deep-learning applied to semantic segmentation of remote sensing data, according to this workflow:
-![alt tag](https://raw.githubusercontent.com/NexGenMap/dl-semantic-segmentation/master/docs/workflow.png)
+ alt tag](https://raw.githubusercontent.com/NexGenMap/dl-semantic-segmentation/master/docs/workflow.png)
 
 ## Workflow Execution (Forest toy data)
-Download the Forest toy data in https://storage.googleapis.com/nextgenmap-dataset/dl-semantic-segmentation/forest_toy.zip and follow the instructions below:
+Download the Forest toy data in https://www.lapig.iesa.ufg.br/lapig/nextgenmap-data/ and follow the instructions below:
 1. Standardize the two images, the one will be used to train the model e another one that will be classified:
 ```sh
 $ ./standardize_imgs.py -n 0 -b 1 2 3 4 -i forest_toy/raw_data/mosaic_201709.tif forest_toy/raw_data/mosaic_201801.tif -o forest_toy/stand_data
 ```
-2. Stack the standardized image and the forest map (e.i. the reference data):
+1. Stack the standardized image and the forest map (e.i. the reference data):
 ```sh
 $ ./stack_imgs.py -i forest_toy/stand_data/mosaic_201709_stand.tif -r forest_toy/raw_data/forest_201709.tif -o forest_toy/stand_data/forest_201709_model_input.vrt
 ```
-3. Generate the chips (i.e. a set of pixels with regular squared size) without data augmentation ([see usages](#usages)):
+1. Generate the chips (i.e. a set of pixels with regular squared size) without data augmentation (see usages):
 ```sh
-$ ./generate_chips.py forest_toy/stand_data/forest_201709_model_input.vrt -o forest_toy/chips
+$ ./generate_chips.py -f 0,0 -r false -l false -i forest_toy/stand_data/forest_201709_model_input.vrt -o forest_toy/chips
 ```
-4. Train a U-net model, for 20 epochs, using default hyperparameter ([see usages](#usages)):
+1. Train a U-net model:
 ```sh
-$ ./train_model.py -e 20 -i forest_toy/chips -o forest_toy/model/
+$ ./evaluate_model.py -i forest_toy/chips -o forest_toy/model
 ```
-* Follow the trainning process using tensorboard:
-```sh
-$ tensorboard --logdir=forest_toy/model/
-```
-5. Evaluate the trained model:
+1. Evaluate the trained model:
 ```sh
 $ ./evaluate_model.py -m forest_toy/model
 ```
-6. Classify the other image:
-```sh
-$ ./classify_imgs.py -m forest_toy/model -i forest_toy/raw_data/mosaic_201801.tif -o forest_toy/result
-```
-* Check the classification result, forest_toy/result/mosaic_201801_pred.tif, in [QGIS](https://www.qgis.org):
+1. Classify the other image:
 ```sh
 $ ./classify_imgs.py -m forest_toy/model -i forest_toy/raw_data/mosaic_201801.tif -o forest_toy/result
 ```

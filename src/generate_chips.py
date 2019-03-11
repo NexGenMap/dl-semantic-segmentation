@@ -57,21 +57,7 @@ def shuffle_chips(dat_ndarray, exp_ndarray, nsamples):
 		dat_ndarray[f1,:,:,:], dat_ndarray[f2,:,:,:] = dat_ndarray[f2,:,:,:], dat_ndarray[f1,:,:,:]
 		exp_ndarray[f1,:,:,:], exp_ndarray[f2,:,:,:] = exp_ndarray[f2,:,:,:], exp_ndarray[f1,:,:,:]
 	
-if __name__ == "__main__":
-	args = parse_args()
-	start_time = time.time()
-
-	img_path = args.image
-	output_dir = args.output_dir
-
-	flip = args.flip
-	rotate = args.rotate
-	pad_size = args.pad_size
-	chip_size = args.chip_size
-	nodata_value = args.nodata
-	discard_nodata = args.discard_nodata
-	offset_list = parse_offset(args.offset)
-
+def exec(img_path, output_dir, chip_size, pad_size,	flip,	rotate, offset_list = [[0,0]], nodata_value = -50.0, discard_nodata = False):
 	print("Analyzing " + img_path + " image.")
 	dat_path, exp_path, mtd_path = image_utils.chips_data_files(output_dir)
 
@@ -90,6 +76,25 @@ if __name__ == "__main__":
 
 	dat_ndarray.flush()
 	exp_ndarray.flush()
+
+	return dat_ndarray, exp_ndarray
+
+if __name__ == "__main__":
+	args = parse_args()
+	start_time = time.time()
+
+	img_path = args.image
+	output_dir = args.output_dir
+
+	flip = args.flip
+	rotate = args.rotate
+	pad_size = args.pad_size
+	chip_size = args.chip_size
+	nodata_value = args.nodata
+	discard_nodata = args.discard_nodata
+	offset_list = parse_offset(args.offset)
+
+	exec(img_path, output_dir, flip, rotate, pad_size, chip_size, offset_list, nodata_value, discard_nodata)
 
 	elapsed_time = time.time() - start_time
 	print('Time elapsed ' + str(elapsed_time) + ' seg.');

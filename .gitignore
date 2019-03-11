@@ -5,3 +5,5 @@
 __pycache__
 src/results
 src/logs_planet
+*.out
+src/workdir/
