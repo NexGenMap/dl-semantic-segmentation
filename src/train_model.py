@@ -14,8 +14,8 @@ def parse_args():
 		' that will be used by training process.', required=True)
 	
 	parser.add_argument("-s", "--seed", help='Seed that will be used to split the chips in train ' + \
-		' and test groups. [DEFAULT=1989]', type=int, default=1989)
-	parser.add_argument("-t", "--test-size", help='Percentage size of the test group.' + \
+		' and evaluation groups. [DEFAULT=1989]', type=int, default=1989)
+	parser.add_argument("-t", "--eval-size", help='Percentage size of the evaluation group.' + \
 		' [DEFAULT=0.2]', type=float, default=0.2)
 	parser.add_argument("-f", "--scale-factor", help='Scale factor that will multiply the input chips ' + \
 		' before training process. If the data type of input chips is integer you should considerer ' + \
@@ -43,7 +43,7 @@ if __name__ == "__main__":
 
 	chips_dir = args.chips_dir
 	output_dir = args.output_dir
-	test_size = args.test_size
+	eval_size = args.eval_size
 	batch_size = args.batch_size
 	epochs = args.epochs
 	seed = args.seed
@@ -53,7 +53,7 @@ if __name__ == "__main__":
 	tf.logging.set_verbosity(tf.logging.INFO)
 
 	dat_path, exp_path, mtd_path = image_utils.chips_data_files(chips_dir)
-	train_data, test_data, train_expect, test_expect, chips_info = image_utils.train_test_split(dat_path, exp_path, mtd_path, test_size)
+	train_data, test_data, train_expect, test_expect, chips_info = image_utils.train_test_split(dat_path, exp_path, mtd_path, eval_size)
 
 	print("Memory size: %d Mb" % ( ((train_data.size * train_data.itemsize) + (test_data.size * test_data.itemsize))*0.000001 ))
 	print("Train data shape: " + str(train_data.shape))

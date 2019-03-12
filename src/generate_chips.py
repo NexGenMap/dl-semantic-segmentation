@@ -28,11 +28,13 @@ def parse_args():
 		' offset argument will be used to produce chips with a percentage of overlap.' + \
 		' An offset 0,50 will generate chips with 50 percent of overlap in the axis y. [DEFAULT=0,0]', nargs='+', default=['0,0'])
 	parser.add_argument("-r", "--rotate", help='As a data augmentation option, ' + \
-		' rotate argument will rotate all the chips at angles 90, 180 and 270 degrees. [DEFAULT=No]', action='store_true')
+		' rotate argument will rotate all the chips at angles 90, 180 and 270 degrees. [DEFAULT=false]', action='store_true')
+	parser.add_argument("-u", "--shuffle", help='Shuffle generated chips. ' + \
+		' If the generated chips is only for test propose, you should set false here. [DEFAULT=true]', action='store_true')
 	parser.add_argument("-l", "--flip", help='As a data augmentation option, ' + \
-		' flip argument will flip, in the left/right direction, all the chips. [DEFAULT=No]', action='store_true')
+		' flip argument will flip, in the left/right direction, all the chips. [DEFAULT=false]', action='store_true')
 	parser.add_argument("-d", "--discard-nodata", help='Chips with nodata values will be discard by' + \
-		' chip generation process. You shouldn\'t considerer put true here. [DEFAULT=No]', action='store_true')
+		' chip generation process. You shouldn\'t considerer put true here. [DEFAULT=false]', action='store_true')
 	
 	return parser.parse_args()
 
@@ -57,7 +59,7 @@ def shuffle_chips(dat_ndarray, exp_ndarray, nsamples):
 		dat_ndarray[f1,:,:,:], dat_ndarray[f2,:,:,:] = dat_ndarray[f2,:,:,:], dat_ndarray[f1,:,:,:]
 		exp_ndarray[f1,:,:,:], exp_ndarray[f2,:,:,:] = exp_ndarray[f2,:,:,:], exp_ndarray[f1,:,:,:]
 	
-def exec(img_path, output_dir, chip_size, pad_size,	flip,	rotate, offset_list = [[0,0]], nodata_value = -50.0, discard_nodata = False):
+def exec(img_path, output_dir, chip_size, pad_size,	flip,	rotate, shuffle = True, offset_list = [[0,0]], nodata_value = -50.0, discard_nodata = False):
 	print("Analyzing " + img_path + " image.")
 	dat_path, exp_path, mtd_path = image_utils.chips_data_files(output_dir)
 
@@ -71,8 +73,9 @@ def exec(img_path, output_dir, chip_size, pad_size,	flip,	rotate, offset_list = 
 	print("Generating " + str(chips_info['dat_shape'][0]) + " chips into " + output_dir + " directory.")
 	image_utils.generate_chips(img_path, dat_ndarray, exp_ndarray, nodata_value, chip_size, pad_size, offset_list, rotate, flip, discard_nodata)
 
-	print("Shuffling generated chips.")
-	shuffle_chips(dat_ndarray, exp_ndarray, chips_info['n_chips'])
+	if shuffle:
+		print("Shuffling generated chips.")
+		shuffle_chips(dat_ndarray, exp_ndarray, chips_info['n_chips'])
 
 	dat_ndarray.flush()
 	exp_ndarray.flush()
@@ -88,13 +91,14 @@ if __name__ == "__main__":
 
 	flip = args.flip
 	rotate = args.rotate
+	shuffle = args.shuffle
 	pad_size = args.pad_size
 	chip_size = args.chip_size
 	nodata_value = args.nodata
 	discard_nodata = args.discard_nodata
 	offset_list = parse_offset(args.offset)
 
-	exec(img_path, output_dir, flip, rotate, pad_size, chip_size, offset_list, nodata_value, discard_nodata)
+	exec(img_path, output_dir, chip_size, pad_size,	flip,	rotate, shuffle, offset_list, nodata_value, discard_nodata)
 
 	elapsed_time = time.time() - start_time
 	print('Time elapsed ' + str(elapsed_time) + ' seg.');

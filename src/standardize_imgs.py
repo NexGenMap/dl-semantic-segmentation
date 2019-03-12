@@ -27,7 +27,7 @@ def parse_args():
 		' It will be ignored when convert-int16 is enabled. [DEFAULT=-50]', type=float, default=-50)
 	parser.add_argument("-t", "--convert-int16", help='Convert the standardized images to ' + \
 		' int16, multiply its pixel values by scale factor 10000. It will reduce the size of' + \
-		' the output files and use -32767 as nodata value. [DEFAULT=No]', action='store_true')
+		' the output files and use -32767 as nodata value. [DEFAULT=false]', action='store_true')
 	parser.add_argument("-o", "--output-dir", help='<Required> Output directory that' + \
 		' will have the standardized images.', required=True)
 	parser.add_argument("-c", "--chunk-size", help='The amount of data that will be processed,' + \

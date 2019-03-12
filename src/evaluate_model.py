@@ -56,15 +56,15 @@ def parse_args():
 		' trained model.')
 	parser.add_argument("-m", "--model-dir", help='<Required> Input directory with' + \
 		' the trained model and the tensorboard logs.', required=True) 
-	parser.add_argument("-t", "--test-size", help='Percentage size of the test group.' + \
-		' [DEFAULT=Value defined by train_model.py]', type=float, default=0)
+	parser.add_argument("-s", "--eval-size", help='Percentage size of chips that will be' + \
+		' used in the evaluation [DEFAULT=Value defined by train_model.py]', type=float, default=0)
 	parser.add_argument("-i", "--chips-dir", help='Input directory of chips' + \
 		' that will be used by evaluation process [DEFAULT=Value defined by train_model.py]', \
 		 default=None)
 
 	return parser.parse_args()
 
-def exec(model_dir, chips_dir, test_size):
+def exec(model_dir, chips_dir, eval_size):
 	tf.logging.set_verbosity(tf.logging.INFO)
 
 	start_time = time.time()
@@ -73,25 +73,25 @@ def exec(model_dir, chips_dir, test_size):
 	params = image_utils.load_object(param_path)
 	tf.set_random_seed(params['seed'])
 
-	if test_size <= 0:
-		test_size = params['test_size']
+	if eval_size <= 0:
+		eval_size = params['eval_size']
 
 	if chips_dir is None:
 		chips_dir = params['chips_dir']
 
 	dat_path, exp_path, mtd_path = image_utils.chips_data_files(chips_dir)
-	train_data, test_data, train_expect, test_expect, chips_info = image_utils.train_test_split(dat_path, exp_path, mtd_path, test_size)
+	train_data, eval_data, train_expect, eval_expect, chips_info = image_utils.train_test_split(dat_path, exp_path, mtd_path, eval_size)
 
 	print("Evaluating the model stored into " + model_dir)
 
 	estimator = tf.estimator.Estimator(model_fn=md.description, params=params, model_dir=model_dir)
-	do_evaluation(estimator, test_data, test_expect, 'test', params)
+	do_evaluation(estimator, eval_data, eval_expect, 'EVALUATING', params)
 
 if __name__ == "__main__":
 	args = parse_args()
 
 	model_dir = args.model_dir
-	test_size = args.test_size
+	eval_size = args.eval_size
 	chips_dir = args.chips_dir
 
-	exec(model_dir, chips_dir, test_size)	
+	exec(model_dir, chips_dir, eval_size)	
