@@ -3,7 +3,7 @@
 import os
 import gdal
 import argparse
-import image_utils
+import dl_utils
 import pickle
 import time
 import numpy as np
@@ -61,17 +61,17 @@ def shuffle_chips(dat_ndarray, exp_ndarray, nsamples):
 	
 def exec(img_path, output_dir, chip_size, pad_size,	flip,	rotate, shuffle = True, offset_list = [[0,0]], nodata_value = -50.0, discard_nodata = False):
 	print("Analyzing " + img_path + " image.")
-	dat_path, exp_path, mtd_path = image_utils.chips_data_files(output_dir)
+	dat_path, exp_path, mtd_path = dl_utils.chips_data_files(output_dir)
 
-	chips_info = image_utils.chips_info(img_path, nodata_value, chip_size, pad_size, offset_list, rotate, flip, discard_nodata)
+	chips_info = dl_utils.chips_info(img_path, nodata_value, chip_size, pad_size, offset_list, rotate, flip, discard_nodata)
 
-	image_utils.save_object(mtd_path, chips_info)
+	dl_utils.save_object(mtd_path, chips_info)
 
 	dat_ndarray = np.memmap(dat_path, dtype=chips_info['dat_dtype'], mode='w+', shape=chips_info['dat_shape'])
 	exp_ndarray = np.memmap(exp_path, dtype=chips_info['exp_dtype'], mode='w+', shape=chips_info['exp_shape'])
 
 	print("Generating " + str(chips_info['dat_shape'][0]) + " chips into " + output_dir + " directory.")
-	image_utils.generate_chips(img_path, dat_ndarray, exp_ndarray, nodata_value, chip_size, pad_size, offset_list, rotate, flip, discard_nodata)
+	dl_utils.generate_chips(img_path, dat_ndarray, exp_ndarray, nodata_value, chip_size, pad_size, offset_list, rotate, flip, discard_nodata)
 
 	if shuffle:
 		print("Shuffling generated chips.")

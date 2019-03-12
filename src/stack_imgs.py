@@ -4,7 +4,7 @@ import os
 import ntpath
 import gdal
 import argparse
-import image_utils
+import dl_utils
 
 import subprocess
 
@@ -37,8 +37,8 @@ def create_vrt_bands(img_path, output_vrt, bands):
 		bands = range(1, (image_ds.RasterCount+1) )
 
 	for band in bands:
-		vrt_filepath = image_utils.new_filepath(img_path, suffix = str(band), ext='vrt', 
-			directory=image_utils.basedir(output_vrt))
+		vrt_filepath = dl_utils.new_filepath(img_path, suffix = str(band), ext='vrt', 
+			directory=dl_utils.basedir(output_vrt))
 
 		command = ["gdalbuildvrt"]
 		command += ["-b", str(band)]

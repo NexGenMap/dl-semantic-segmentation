@@ -1,40 +1,45 @@
 # dl-semantic-segmentation
 
 Deep-learning applied to semantic segmentation of remote sensing data, according to this workflow:
- alt tag](https://raw.githubusercontent.com/NexGenMap/dl-semantic-segmentation/master/docs/workflow.png)
+![alt tag](https://raw.githubusercontent.com/NexGenMap/dl-semantic-segmentation/master/docs/workflow.png)
 
 ## Workflow Execution (Forest toy data)
-Download the Forest toy data in https://www.lapig.iesa.ufg.br/lapig/nextgenmap-data/ and follow the instructions below:
+Download the Forest toy data in https://storage.googleapis.com/nextgenmap-dataset/dl-semantic-segmentation/forest_toy.zip and follow the instructions below (...if you are hurry, run all the thing by run_forest_toy.sh):
 1. Standardize the two images, the one will be used to train the model e another one that will be classified:
 ```sh
 $ ./standardize_imgs.py -n 0 -b 1 2 3 4 -i forest_toy/raw_data/mosaic_201709.tif forest_toy/raw_data/mosaic_201801.tif -o forest_toy/stand_data
 ```
-1. Stack the standardized image and the forest map (e.i. the reference data):
+2. Stack the standardized image and the forest map (e.i. the reference data):
 ```sh
 $ ./stack_imgs.py -i forest_toy/stand_data/mosaic_201709_stand.tif -r forest_toy/raw_data/forest_201709.tif -o forest_toy/stand_data/forest_201709_model_input.vrt
 ```
-1. Generate the chips (i.e. a set of pixels with regular squared size) without data augmentation (see usages):
+3. Generate the chips (i.e. a set of pixels with regular squared size) without data augmentation ([see usages](#usages)):
 ```sh
-$ ./generate_chips.py -f 0,0 -r false -l false -i forest_toy/stand_data/forest_201709_model_input.vrt -o forest_toy/chips
+$ ./generate_chips.py -f 0,0 -r -l -u -i forest_toy/stand_data/forest_201709_model_input.vrt -o forest_toy/chips
 ```
-1. Train a U-net model:
+4. Train a U-net model, for 20 epochs, using default hyperparameter ([see usages](#usages)):
 ```sh
-$ ./evaluate_model.py -i forest_toy/chips -o forest_toy/model
+$ ./train_model.py -e 20 -i forest_toy/chips -o forest_toy/model/
 ```
-1. Evaluate the trained model:
+* Follow the trainning process using tensorboard:
+```sh
+$ tensorboard --logdir=forest_toy/model/
+```
+5. Evaluate the trained model:
 ```sh
 $ ./evaluate_model.py -m forest_toy/model
 ```
-1. Classify the other image:
+6. Classify the other image:
 ```sh
 $ ./classify_imgs.py -m forest_toy/model -i forest_toy/raw_data/mosaic_201801.tif -o forest_toy/result
 ```
+* Check the classification result, forest_toy/result/mosaic_201801_pred.tif, in [QGIS](https://www.qgis.org):
 ## Usages
 **standardize_imgs.py**
 ```sh
 usage: standardize_imgs.py [-h] -i IMAGES [IMAGES ...] -b BANDS [BANDS ...] -n
-                           IN_NODATA [-d OUT_NODATA] [-t CONVERT_INT16] -o
-                           OUTPUT_DIR [-c CHUNK_SIZE]
+                           IN_NODATA [-d OUT_NODATA] [-t] -o OUTPUT_DIR
+                           [-c CHUNK_SIZE]
 
 STEP 01/06 - Standardize multiple images using the formula: (value - median) /
 std_dev. The median and std_dev will be calculate by band (e.g. blue, red)
@@ -50,12 +55,11 @@ optional arguments:
                         <Required> Nodata value of input images.
   -d OUT_NODATA, --out-nodata OUT_NODATA
                         Nodata value of standardized images. It will be
-                        ignores when convert-int16=True. [DEFAULT=-50]
-  -t CONVERT_INT16, --convert-int16 CONVERT_INT16
-                        Convert the standardized images to int16, multiply its
+                        ignored when convert-int16 is enabled. [DEFAULT=-50]
+  -t, --convert-int16   Convert the standardized images to int16, multiply its
                         pixel values by scale factor 10000. It will reduce the
                         size of the output files and use -32767 as nodata
-                        value. [DEFAULT=False]
+                        value. [DEFAULT=false]
   -o OUTPUT_DIR, --output-dir OUTPUT_DIR
                         <Required> Output directory that will have the
                         standardized images.
@@ -80,9 +84,9 @@ optional arguments:
   -b BANDS [BANDS ...], --bands BANDS [BANDS ...]
                         The bands that should be stacked. [DEFAULT=All]
   -r REFERENCE, --reference REFERENCE
-                        <Required> Image with reference data, that should have
-                        only these pixel values: 0=without information,
-                        1=object of interest, 2=not an object of interest.
+                        Image with reference data, that should have only these
+                        pixel values: 0=without information, 1=object of
+                        interest, 2=not an object of interest.
   -o OUTPUT, --output OUTPUT
                         <Required> The name of VRT output image
 
@@ -91,7 +95,7 @@ optional arguments:
 ```sh
 usage: generate_chips.py [-h] -i IMAGE -o OUTPUT_DIR [-n NODATA]
                          [-s CHIP_SIZE] [-p PAD_SIZE] [-f OFFSET [OFFSET ...]]
-                         [-r ROTATE] [-l FLIP] [-d DISCARD_NODATA]
+                         [-r] [-u] [-l] [-d]
 
 STEP 03/06 - Generate a several chips (i.e. a set of pixels with regular
 squared size) considerering the input image. The last band will be used as
@@ -122,22 +126,23 @@ optional arguments:
                         used to produce chips with a percentage of overlap. An
                         offset 0,50 will generate chips with 50 percent of
                         overlap in the axis y. [DEFAULT=0,0]
-  -r ROTATE, --rotate ROTATE
-                        As a data augmentation option, rotate argument will
+  -r, --rotate          As a data augmentation option, rotate argument will
                         rotate all the chips at angles 90, 180 and 270
-                        degrees. [DEFAULT=True]
-  -l FLIP, --flip FLIP  As a data augmentation option, flip argument will
+                        degrees. [DEFAULT=false]
+  -u, --shuffle         Shuffle generated chips. If the generated chips is
+                        only for test propose, you should set false here.
+                        [DEFAULT=true]
+  -l, --flip            As a data augmentation option, flip argument will
                         flip, in the left/right direction, all the chips.
-                        [DEFAULT=True]
-  -d DISCARD_NODATA, --discard-nodata DISCARD_NODATA
-                        Chips with nodata values will be discard by chip
+                        [DEFAULT=false]
+  -d, --discard-nodata  Chips with nodata values will be discard by chip
                         generation process. You shouldn't considerer put true
-                        here. [DEFAULT=True]
+                        here. [DEFAULT=false]
 
 ```
 **train_model.py**
 ```sh
-usage: train_model.py [-h] -i CHIPS_DIR [-s SEED] [-t TEST_SIZE]
+usage: train_model.py [-h] -i CHIPS_DIR [-s SEED] [-t EVAL_SIZE]
                       [-f SCALE_FACTOR] [-e EPOCHS] [-b BATCH_SIZE]
                       [-l LEARNING_RATE] [-d DROPOUT_RATE] [-r L2_REGULARIZER]
                       -o OUTPUT_DIR [-m TENSORBOARD_MAXOUTPUT]
@@ -150,9 +155,9 @@ optional arguments:
                         <Required> Input directory of chips that will be used
                         by training process.
   -s SEED, --seed SEED  Seed that will be used to split the chips in train and
-                        test groups. [DEFAULT=1989]
-  -t TEST_SIZE, --test-size TEST_SIZE
-                        Percentage size of the test group. [DEFAULT=0.2]
+                        evaluation groups. [DEFAULT=1989]
+  -t EVAL_SIZE, --eval-size EVAL_SIZE
+                        Percentage size of the evaluation group. [DEFAULT=0.2]
   -f SCALE_FACTOR, --scale-factor SCALE_FACTOR
                         Scale factor that will multiply the input chips before
                         training process. If the data type of input chips is
@@ -178,10 +183,11 @@ optional arguments:
   -m TENSORBOARD_MAXOUTPUT, --tensorboard-maxoutput TENSORBOARD_MAXOUTPUT
                         The number of chips that will presented by tensorboard
                         during the training process. [DEFAULT=2]
+
 ```
 **evaluate_model.py**
 ```sh
-usage: evaluate_model.py [-h] -m MODEL_DIR
+usage: evaluate_model.py [-h] -m MODEL_DIR [-s EVAL_SIZE] [-i CHIPS_DIR]
 
 STEP 05/06 - Evaluate a trained model.
 
@@ -190,6 +196,14 @@ optional arguments:
   -m MODEL_DIR, --model-dir MODEL_DIR
                         <Required> Input directory with the trained model and
                         the tensorboard logs.
+  -s EVAL_SIZE, --eval-size EVAL_SIZE
+                        Percentage size of chips that will be used in the
+                        evaluation [DEFAULT=Value defined by train_model.py]
+  -i CHIPS_DIR, --chips-dir CHIPS_DIR
+                        Input directory of chips that will be used by
+                        evaluation process [DEFAULT=Value defined by
+                        train_model.py]
+
 ```
 **classify_imgs.py**
 ```sh
@@ -214,4 +228,5 @@ optional arguments:
                         the value defined by this argument. After that, the
                         classification will execute for readed data.
                         [DEFAULT=40.0]
+
 ```

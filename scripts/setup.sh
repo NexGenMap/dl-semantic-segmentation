@@ -16,6 +16,5 @@ sudo pip3 install scikit-learn
 sudo pip3 install matplotlib 
 sudo pip3 install seaborn
 sudo pip3 install psutil
-sudo pip3 install download https://bitbucket.org/chchrsc/rios/downloads/rios-1.4.5.tar.gz
 
 echo "Installation Done"

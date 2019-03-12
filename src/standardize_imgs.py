@@ -9,7 +9,7 @@ import csv
 import time
 import osr
 from pathlib import Path
-import image_utils
+import dl_utils
 
 import argparse
 
@@ -73,7 +73,7 @@ def prepare_chunks(image_file, band, chunk_x_size, in_nodata):
 			chunk_x_size = x_size - xoff
 
 		suffix = 'b'+str(band) +'_' +'x'+str(xoff)
-		chunk_id = image_utils.new_filepath(image_file, suffix = suffix, ext='', directory='')
+		chunk_id = dl_utils.new_filepath(image_file, suffix = suffix, ext='', directory='')
 		indexes.append({
 			'id':chunk_id, 
 			'image_file':image_file, 
@@ -147,7 +147,7 @@ def calc_freq_histogram(images, band, in_nodata, output_dir, chunk_x_size):
 		input_images.append(image_path)
 
 		csvSuffix = 'b'+str(band)+'_byimgs'
-		csvFreqFile = image_utils.new_filepath(image_path, suffix = csvSuffix, \
+		csvFreqFile = dl_utils.new_filepath(image_path, suffix = csvSuffix, \
 			ext='csv', directory=output_dir)
 
 		export_csv(csvFreqFile, image_path, freq_histogram_aux)
@@ -159,7 +159,7 @@ def calc_freq_histogram(images, band, in_nodata, output_dir, chunk_x_size):
 			band_count_vals = list(freq_histogram_aux.values())
 			merge_unique_values(freq_histogram, band_uniq_vals, band_count_vals)
 	
-	csvFreqFile = image_utils.new_filepath('band'+str(band), suffix = 'all', \
+	csvFreqFile = dl_utils.new_filepath('band'+str(band), suffix = 'all', \
 		ext='csv', directory=output_dir)
 
 	export_csv(csvFreqFile, input_images, freq_histogram)
@@ -172,7 +172,7 @@ def standardize(images, band, stats, output_dir, convert_int16, bands, chunk_x_s
 	
 	for image_path in images:
 
-		output_image_path = image_utils.new_filepath(image_path, suffix = 'stand', \
+		output_image_path = dl_utils.new_filepath(image_path, suffix = 'stand', \
 			directory=output_dir)
 
 		print("Standardizing band " + str(band) + ' ' + image_path + " => " + output_image_path)
@@ -184,7 +184,7 @@ def standardize(images, band, stats, output_dir, convert_int16, bands, chunk_x_s
 			if convert_int16:
 				dataType = gdal.GDT_Int16
 
-			output_ds = image_utils.create_output_file(image_path, output_image_path, \
+			output_ds = dl_utils.create_output_file(image_path, output_image_path, \
 				nbands, dataType)
 
 		else:
@@ -235,7 +235,7 @@ if __name__ == "__main__":
 	output_dir = args.output_dir
 
 	start_time = time.time()
-	image_utils.mkdirp(output_dir)
+	dl_utils.mkdirp(output_dir)
 
 	for band in bands:
 		freq_histogram = calc_freq_histogram(images, band, in_nodata, output_dir, chunk_x_size)

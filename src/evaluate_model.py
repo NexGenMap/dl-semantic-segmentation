@@ -2,7 +2,7 @@
 
 import argparse
 
-from models import unet as md
+from dl_models import unet as md
 import tensorflow as tf
 import numpy as np
 
@@ -13,7 +13,7 @@ from sklearn.metrics import confusion_matrix
 import time
 import gc
 import gdal
-import image_utils
+import dl_utils
 
 def do_evaluation(estimator, input_data, input_expected, category, params):
 	predict_input_fn = tf.estimator.inputs.numpy_input_fn(x={"data": input_data}, batch_size=params['batch_size'], shuffle=False)
@@ -24,7 +24,7 @@ def do_evaluation(estimator, input_data, input_expected, category, params):
 
 	for predict, expect in zip(predict_results, input_expected):
 		
-		predict_out = image_utils.discretize_values(predict, 1, 0)
+		predict_out = dl_utils.discretize_values(predict, 1, 0)
 
 		pre_flat = predict_out.reshape(-1)
 		exp_flat = expect.reshape(-1)
@@ -69,8 +69,8 @@ def exec(model_dir, chips_dir, eval_size):
 
 	start_time = time.time()
 
-	param_path = image_utils.new_filepath('train_params.dat', directory=model_dir)
-	params = image_utils.load_object(param_path)
+	param_path = dl_utils.new_filepath('train_params.dat', directory=model_dir)
+	params = dl_utils.load_object(param_path)
 	tf.set_random_seed(params['seed'])
 
 	if eval_size <= 0:
@@ -79,8 +79,8 @@ def exec(model_dir, chips_dir, eval_size):
 	if chips_dir is None:
 		chips_dir = params['chips_dir']
 
-	dat_path, exp_path, mtd_path = image_utils.chips_data_files(chips_dir)
-	train_data, eval_data, train_expect, eval_expect, chips_info = image_utils.train_test_split(dat_path, exp_path, mtd_path, eval_size)
+	dat_path, exp_path, mtd_path = dl_utils.chips_data_files(chips_dir)
+	train_data, eval_data, train_expect, eval_expect, chips_info = dl_utils.train_test_split(dat_path, exp_path, mtd_path, eval_size)
 
 	print("Evaluating the model stored into " + model_dir)
 

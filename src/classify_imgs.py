@@ -1,7 +1,7 @@
 #!/usr/bin/python3
 import argparse
 
-from models import unet as md
+from dl_models import unet as md
 import tensorflow as tf
 import numpy as np
 
@@ -11,7 +11,7 @@ from sklearn.metrics import classification_report
 import time
 import gc
 import gdal
-import image_utils
+import dl_utils
 
 def parse_args():
 	parser = argparse.ArgumentParser(description='STEP 06/06 - Classify a list of images' + \
@@ -31,28 +31,29 @@ def parse_args():
 def exec(images, model_dir, output_dir, memory_percentage = 40):
 	tf.logging.set_verbosity(tf.logging.INFO)
 
-	image_utils.mkdirp(output_dir)
+	dl_utils.mkdirp(output_dir)
 
-	param_path = image_utils.new_filepath('train_params.dat', directory=model_dir)
-	params = image_utils.load_object(param_path)
+	param_path = dl_utils.new_filepath('train_params.dat', directory=model_dir)
+	params = dl_utils.load_object(param_path)
 
-	chips_info_path = image_utils.new_filepath('chips_info.dat', directory=model_dir)
-	chips_info = image_utils.load_object(chips_info_path)
+	chips_info_path = dl_utils.new_filepath('chips_info.dat', directory=model_dir)
+	chips_info = dl_utils.load_object(chips_info_path)
 
 	for in_image in images:
 
 		in_image_ds = gdal.Open(in_image)
-		out_image = image_utils.new_filepath(in_image, suffix='pred', ext='tif' , directory=output_dir)
-		out_image_ds = image_utils.create_output_file(in_image, out_image)
+		out_image = dl_utils.new_filepath(in_image, suffix='pred', ext='tif' , directory=output_dir)
+		out_image_ds = dl_utils.create_output_file(in_image, out_image)
 		out_band = out_image_ds.GetRasterBand(1)
 
 		estimator = tf.estimator.Estimator(model_fn=md.description, params=params, model_dir=model_dir)
 
+		print(chips_info)
 		_, dat_xsize, dat_ysize, dat_nbands = chips_info['dat_shape']
 		_, exp_xsize, exp_ysize, _ = chips_info['exp_shape']
 		pad_size = int( (dat_xsize - exp_xsize) / 2 )
 
-		input_positions = image_utils.get_predict_positions(in_image_ds.RasterXSize, in_image_ds.RasterYSize, exp_xsize, pad_size)
+		input_positions = dl_utils.get_predict_positions(in_image_ds.RasterXSize, in_image_ds.RasterYSize, exp_xsize, pad_size)
 
 		cache_chip_data = []
 		cache_out_position = []
@@ -62,7 +63,7 @@ def exec(images, model_dir, output_dir, memory_percentage = 40):
 			input_position = input_positions[i]
 			
 			try:
-				chip_data, out_position = image_utils.get_predict_data(in_image_ds, input_position, pad_size)
+				chip_data, out_position = dl_utils.get_predict_data(in_image_ds, input_position, pad_size)
 			except IOError as error:
 				print(error)
 				print('Ignoring this data block')
@@ -71,9 +72,9 @@ def exec(images, model_dir, output_dir, memory_percentage = 40):
 			cache_chip_data.append(chip_data)
 			cache_out_position.append(out_position)
 
-			print("Reading image " + in_image + ": memory percentage " + str(image_utils.memory_percentage()) + "%" )		
+			print("Reading image " + in_image + ": memory percentage " + str(dl_utils.memory_percentage()) + "%" )		
 
-			if (image_utils.memory_percentage() > memory_percentage) or i == (len(input_positions)-1):
+			if (dl_utils.memory_percentage() > memory_percentage) or i == (len(input_positions)-1):
 				input_data = np.stack(cache_chip_data)
 
 				del cache_chip_data
@@ -89,7 +90,7 @@ def exec(images, model_dir, output_dir, memory_percentage = 40):
 
 				print("Writing classification result in " + out_image)
 				for chip_predict, out_position in zip(predict_results, cache_out_position):
-					out_predict = image_utils.discretize_values(chip_predict, 1, 0)
+					out_predict = dl_utils.discretize_values(chip_predict, 1, 0)
 
 					out_x0 = out_position[0]
 					out_xy = out_position[1]
