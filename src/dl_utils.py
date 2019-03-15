@@ -1,6 +1,6 @@
 import os
-import gdal
-import osr
+from osgeo import gdal
+from osgeo import osr
 import numpy as np
 import psutil
 import gc
