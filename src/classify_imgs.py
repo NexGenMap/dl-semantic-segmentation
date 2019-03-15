@@ -10,7 +10,7 @@ from sklearn.metrics import classification_report
 
 import time
 import gc
-import gdal
+from osgeo import gdal
 import dl_utils
 
 def parse_args():
