@@ -1,13 +1,13 @@
 #!/usr/bin/python3
 
 import math
-import gdal
+from osgeo import gdal
 import numpy as np
 import multiprocessing
 import os
 import csv
 import time
-import osr
+from osgeo import osr
 from pathlib import Path
 import dl_utils
 
