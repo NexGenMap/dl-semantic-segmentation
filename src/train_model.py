@@ -20,7 +20,7 @@ def parse_args():
 	parser.add_argument("-f", "--scale-factor", help='Scale factor that will multiply the input chips ' + \
 		' before training process. If the data type of input chips is integer you should considerer ' + \
 		' use this argument. [DEFAULT=1.0]', type=float, default=1.0)
-	
+
 	parser.add_argument("-e", "--epochs", help='Number of epochs of the training process. [DEFAULT=100]', type=int, default=100)
 	parser.add_argument("-b", "--batch-size", help='Batch size of training process. ' + \
 		' In case of memory error you should decrease this argument. [DEFAULT=32]', type=int, default=32)
@@ -72,7 +72,7 @@ if __name__ == "__main__":
 
 	for i in range(0, epochs):
 		train_input = tf.estimator.inputs.numpy_input_fn(x={"data": train_data}, y=train_expect, batch_size=batch_size, num_epochs=1, shuffle=True)
-		train_results = estimator.train(input_fn=train_input, steps=None, hooks=[logging_hook])
+		train_results = estimator.train(input_fn=train_input, steps=None, hooks=[])
 
 		test_input = tf.estimator.inputs.numpy_input_fn(x={"data": test_data}, y=test_expect, batch_size=batch_size, num_epochs=1, shuffle=False)
 		test_results = estimator.evaluate(input_fn=test_input)

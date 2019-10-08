@@ -12,7 +12,7 @@ from sklearn.metrics import confusion_matrix
 
 import time
 import gc
-from osgeo import gdal
+import gdal
 import dl_utils
 
 def do_evaluation(estimator, input_data, input_expected, category, params):

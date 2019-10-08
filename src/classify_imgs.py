@@ -10,7 +10,7 @@ from sklearn.metrics import classification_report
 
 import time
 import gc
-from osgeo import gdal
+import gdal
 import dl_utils
 
 def parse_args():
@@ -92,10 +92,29 @@ def exec(images, model_dir, output_dir, memory_percentage = 40):
 				for chip_predict, out_position in zip(predict_results, cache_out_position):
 					out_predict = dl_utils.discretize_values(chip_predict, 1, 0)
 
+					out_data = out_predict[:,:,0]
 					out_x0 = out_position[0]
-					out_xy = out_position[1]
+					out_y0 = out_position[1]
+
+					out_xlen, out_ylen = out_data.shape
+
+					# Crop data out of bounds to image size
+					if ((out_x0 + out_xlen) > in_image_ds.RasterXSize):
+						print('out_x0', out_data.shape)
+						out_xlen = in_image_ds.RasterXSize - out_x0
+						out_data = out_data[:,0:out_xlen]
+						print('out_x0', out_data.shape)
+						print(out_x0, in_image_ds.RasterXSize)
+
+					if ((out_y0 + out_ylen) > in_image_ds.RasterYSize):
+						print('out_y0', out_data.shape)
+						out_ylen = in_image_ds.RasterYSize - out_y0
+						out_data = out_data[0:out_ylen,:]
+						print('out_y0', out_data.shape)
+						print(out_y0, in_image_ds.RasterYSize)
+
 					count = count + 1
-					out_band.WriteArray(out_predict[:,:,0], out_x0, out_xy)
+					out_band.WriteArray(out_data, out_x0, out_y0)
 
 				out_band.FlushCache()
 

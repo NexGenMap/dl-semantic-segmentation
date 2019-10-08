@@ -1,6 +1,6 @@
 import os
-from osgeo import gdal
-from osgeo import osr
+import gdal
+import osr
 import numpy as np
 import psutil
 import gc
@@ -44,9 +44,9 @@ def pad_index(index, dim_size, chip_size, pad_size):
 	i0 = (index - pad_size)
 	i1 = (index + chip_size + pad_size)
 
-	if i1 > (dim_size + pad_size):
-		i1 = (dim_size + pad_size)
-		i0 = i1 - chip_size - 2*pad_size
+	if (i0 < 0):
+		i0 = 0
+		i1 = i0 + chip_size + pad_size
 
 	return i0, i1
 
@@ -96,10 +96,9 @@ def chips_info(img_path, nodata_value, chip_size, pad_size, offset_list=[(0,0)],
 
 			chip_data, chip_expect = split_data(chip_data, pad_size)
 			xsize, ysize, _ = chip_expect.shape
-		
-			if (chip_size == xsize and chip_size == ysize) and (not discard_nodata or float(np.min(chip_expect)) != float(nodata_value)):
-				if(float(np.max(chip_expect)) > float(0.0)): # Only include chips with some object
-					total_nchips += 1
+
+			if (chip_size == xsize and chip_size == ysize) and (not discard_nodata or float(np.max(chip_expect)) != float(nodata_value)):
+				total_nchips += 1
 	
 	if rotate:
 		total_nchips *= 4
@@ -141,17 +140,16 @@ def generate_chips(img_path, dat_ndarray, exp_ndarray, nodata_value, chip_size, 
 			chip_data, chip_expect = split_data(chip_data, pad_size)
 			xsize, ysize, _ = chip_expect.shape
 			
-			if (chip_size == xsize and chip_size == ysize) and (not discard_nodata or float(np.min(chip_expect)) != float(nodata_value)):
-				if(float(np.max(chip_expect)) > float(0.0)): # Only include chips with some object
-					chip_expect[ chip_expect != 1] = 0 # convert all other class to pixel == 0
-					chip_data_aux = chip_augmentation(chip_data, rotate, flip)
-					chip_expect_aux = chip_augmentation(chip_expect, rotate, flip)
-					nchips = len(chip_data_aux)
+			if (chip_size == xsize and chip_size == ysize) and (not discard_nodata or float(np.max(chip_expect)) != float(nodata_value)):
+				chip_expect[ chip_expect != 1] = 0 # convert all other class to pixel == 0
+				chip_data_aux = chip_augmentation(chip_data, rotate, flip)
+				chip_expect_aux = chip_augmentation(chip_expect, rotate, flip)
+				nchips = len(chip_data_aux)
 
-					dat_ndarray[index:index+nchips,:,:,:] = np.stack(chip_data_aux)
-					exp_ndarray[index:index+nchips,:,:,:] = np.stack(chip_expect_aux)
+				dat_ndarray[index:index+nchips,:,:,:] = np.stack(chip_data_aux)
+				exp_ndarray[index:index+nchips,:,:,:] = np.stack(chip_expect_aux)
 
-					index = index + nchips
+				index = index + nchips
 
 def train_test_split(dat_path, exp_path, mtd_path, test_size=0.2):
 
@@ -252,51 +250,50 @@ def get_predict_data(input_img_ds, input_position, pad_size):
 	inp_y0 = input_position[2]
 	inp_y1 = input_position[3]
 
-	inp_xlen = inp_x1 - inp_x0
-	inp_ylen = inp_y1 - inp_y0
-
 	inp_x0pad = 0
 	inp_y0pad = 0
 	inp_x1pad = 0
 	inp_y1pad = 0
+	
+	inp_xlen = inp_x1 - inp_x0
+	inp_ylen = inp_y1 - inp_y0
+
 	out_x0 = inp_x0 + pad_size
 	out_y0 = inp_y0 + pad_size
-
+	
 	if (inp_x0 == 0):
-		inp_xlen = inp_xlen-pad_size
 		inp_x0pad = pad_size
 		out_x0 = 0
 
 	if (inp_y0 == 0):
-		inp_ylen = inp_ylen-pad_size
 		inp_y0pad = pad_size
 		out_y0 = 0
 
-	if (inp_x1 > input_img_ds.RasterXSize):
-		inp_xlen = inp_xlen-pad_size
-		inp_x1pad = pad_size
-	
-	if inp_y1 > input_img_ds.RasterYSize:
-		inp_ylen = inp_ylen-pad_size
-		inp_y1pad = pad_size
+	if inp_x1 > input_img_ds.RasterXSize:
+		inp_x1pad = (inp_x1 - input_img_ds.RasterXSize)
 
-	try:
-		chip_data = input_img_ds.ReadAsArray(inp_x0, inp_y0, inp_xlen, inp_ylen)
-	except:
-		raise IOError('Reading error in position (' + str(inp_x0) + ',' + str(inp_y0) + ')' + \
-			' size (' + str(inp_xlen) + ',' + str(inp_ylen) + ')')
+		inp_x1 = input_img_ds.RasterXSize
+		inp_xlen = inp_xlen - inp_x1pad
+
+	if inp_y1 > input_img_ds.RasterYSize:
+		inp_y1pad = (inp_y1 - input_img_ds.RasterYSize)
+
+		inp_y1 = input_img_ds.RasterYSize
+		inp_ylen = inp_ylen - inp_y1pad
+
+	chip_data = input_img_ds.ReadAsArray(inp_x0, inp_y0, inp_xlen, inp_ylen)
 	chip_data = np.pad(chip_data, [(0,0), (inp_y0pad, inp_y1pad), (inp_x0pad, inp_x1pad)], mode='reflect')
 	chip_data = np.transpose(chip_data, [1,2,0])
 
 	return chip_data, [out_x0, out_y0]
 
-def get_predict_positions(x_size, y_size, chip_size = 388, pad_size = 92, x_offset = 0, y_offset = 0):
+def get_predict_positions(x_size, y_size, chip_size = 100, pad_size = 93, x_offset = 0, y_offset = 0):
 
-	x_start = pad_size + x_offset
-	x_end = x_size - pad_size
+	x_start = x_offset
+	x_end = x_size
 
-	y_start = pad_size + y_offset
-	y_end = y_size - pad_size
+	y_start = y_offset
+	y_end = y_size
 
 	input_positions = []
 

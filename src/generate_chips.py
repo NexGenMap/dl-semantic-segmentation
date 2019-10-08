@@ -1,7 +1,7 @@
 #!/usr/bin/python3
 
 import os
-from osgeo import gdal
+import gdal
 import argparse
 import dl_utils
 import pickle
